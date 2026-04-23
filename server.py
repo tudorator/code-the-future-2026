@@ -1,31 +1,19 @@
-from flask import Flask, request, jsonify, Response
-import json
-import time
+from flask import Flask, request, jsonify
+from flask_socketio import SocketIO
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-latest_data = {
-    "temperature": 0,
-    "pressure": 0,
-    "humidity": 0
-}
-
-# ESP32 sends data here
 @app.route('/data', methods=['POST'])
-def receive_data():
-    global latest_data
-    latest_data = request.json
-    print(f"Received: {latest_data}")
-    return jsonify({"status": "OK"})
-
-# Frontend listens here for live updates
-@app.route('/stream')
-def stream():
-    def generate():
-        while True:
-            yield f"data: {json.dumps(latest_data)}\n\n"
-            time.sleep(1)
-    return Response(generate(), mimetype='text/event-stream')
+def receive_esp_data():
+    data = request.json
+    print(f"Received from ESP32: {data}")
+    
+    socketio.emit('sensor_update', data)
+    
+    return jsonify({"status": "success"}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, threaded=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
